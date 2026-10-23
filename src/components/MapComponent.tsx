@@ -48,7 +48,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'critical_high' | 'with_incidents'>('all');
   const [showCriticalMarkers, setShowCriticalMarkers] = useState<boolean>(true);
-  const [activeBasemap, setActiveBasemap] = useState<'google' | 'blanco' | 'satellite' | 'osm'>('google');
+  const [activeBasemap, setActiveBasemap] = useState<'blanco' | 'satellite' | 'osm' | 'google'>('blanco');
 
   // Map of normalized name to summary
   const summaryByNormalizedName = useMemo(() => {
@@ -555,17 +555,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           <span>Fondo:</span>
         </span>
         <button
-          onClick={() => setActiveBasemap('google')}
-          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-            activeBasemap === 'google' 
-              ? 'bg-[#691C32] text-white shadow-xs' 
-              : 'text-slate-700 hover:bg-slate-100'
-          }`}
-          title="Mapa oficial de Google Maps con carreteras y localidades"
-        >
-          Google Maps
-        </button>
-        <button
           onClick={() => setActiveBasemap('blanco')}
           className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
             activeBasemap === 'blanco' 
@@ -597,6 +586,17 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           title="Cartografía OpenStreetMap"
         >
           OSM
+        </button>
+        <button
+          onClick={() => setActiveBasemap('google')}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+            activeBasemap === 'google' 
+              ? 'bg-[#691C32] text-white shadow-xs' 
+              : 'text-slate-700 hover:bg-slate-100'
+          }`}
+          title="Mapa oficial de Google Maps con carreteras y localidades"
+        >
+          Google Maps
         </button>
       </div>
     </div>
