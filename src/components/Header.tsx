@@ -52,15 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden md:inline text-rose-300">
             Línea de Emergencia Estatal: <strong>911</strong> / Protección Civil Hidalgo: <strong>(771) 714 8505</strong>
           </span>
-          <button 
-            onClick={onOpenPdfOriginal}
-            className="inline-flex items-center gap-1 text-amber-200 hover:text-white underline underline-offset-2 transition-colors cursor-pointer"
-            title="Ver Concentrado Ejecutivo Oficial en PDF"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Ver PDF Fuente Oficial</span>
-            <ExternalLink className="w-3 h-3" />
-          </button>
+    
         </div>
       </div>
 
@@ -77,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Gobierno del Estado de Hidalgo
               </span>
               <span className="text-[10px] sm:text-xs text-rose-300 hidden md:inline">
-                Subsecretaría de Protección Civil y Gestión de Riesgos
+                Secretaría de Gobierno
               </span>
             </div>
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white leading-tight font-serif mt-0.5">
