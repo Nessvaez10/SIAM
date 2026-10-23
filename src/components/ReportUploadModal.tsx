@@ -20,12 +20,14 @@ interface ReportUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyChanges: (validatedChanges: ExtractionChangeItem[]) => void;
+  onUpdateActivePdf?: (fileUrl: string, fileName: string) => void;
 }
 
 export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   isOpen,
   onClose,
   onApplyChanges,
+  onUpdateActivePdf,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string>('actualizacion_21_octubre');
@@ -218,6 +220,10 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
                     const f = e.target.files?.[0];
                     if (f) {
                       setFile(f);
+                      if (onUpdateActivePdf) {
+                        const blobUrl = URL.createObjectURL(f);
+                        onUpdateActivePdf(blobUrl, f.name);
+                      }
                       handleRunAnalysis();
                     }
                   }}

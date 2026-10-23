@@ -41,13 +41,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const currentTileLayerRef = useRef<L.TileLayer | null>(null);
   
   const [geoData, setGeoData] = useState<any>(null);
   const [loadingGeo, setLoadingGeo] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'critical_high' | 'with_incidents'>('all');
   const [showCriticalMarkers, setShowCriticalMarkers] = useState<boolean>(true);
-  const [activeBasemap, setActiveBasemap] = useState<'carto' | 'osm' | 'satellite'>('carto');
+  const [activeBasemap, setActiveBasemap] = useState<'google' | 'blanco' | 'satellite' | 'osm'>('google');
 
   // Map of normalized name to summary
   const summaryByNormalizedName = useMemo(() => {
@@ -82,7 +83,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return; // already initialized
 
-    // Center on Hidalgo (20.5° N, 98.9° W)
+    // Center on Hidalgo (20.52° N, -98.85° W)
     const map = L.map(mapContainerRef.current, {
       center: [20.52, -98.85],
       zoom: 8.4,
@@ -90,13 +91,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       minZoom: 7,
       maxZoom: 16,
     });
-
-    // Basemaps
-    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
 
     mapInstanceRef.current = map;
     markersLayerRef.current = L.layerGroup().addTo(map);
@@ -107,29 +101,44 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     };
   }, []);
 
-  // Switch basemap tile layer
+  // Switch basemap tile layer (No CARTO watermark or API key issues)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    map.eachLayer(layer => {
-      if (layer instanceof L.TileLayer) {
-        map.removeLayer(layer);
-      }
-    });
-
-    let newUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    let attribution = '&copy; OpenStreetMap &copy; CARTO';
-
-    if (activeBasemap === 'osm') {
-      newUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-      attribution = '&copy; OpenStreetMap contributors';
-    } else if (activeBasemap === 'satellite') {
-      newUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      attribution = 'Tiles &copy; Esri';
+    if (currentTileLayerRef.current) {
+      map.removeLayer(currentTileLayerRef.current);
+      currentTileLayerRef.current = null;
     }
 
-    L.tileLayer(newUrl, { attribution, maxZoom: 19 }).addTo(map);
+    if (activeBasemap === 'google') {
+      // Crisp Google Maps standard road and terrain map
+      const layer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        subdomains: ['0', '1', '2', '3'],
+        maxZoom: 20
+      }).addTo(map);
+      currentTileLayerRef.current = layer;
+    } else if (activeBasemap === 'satellite') {
+      // High-resolution Google Hybrid Satellite imagery with place names
+      const layer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        subdomains: ['0', '1', '2', '3'],
+        maxZoom: 20
+      }).addTo(map);
+      currentTileLayerRef.current = layer;
+    } else if (activeBasemap === 'osm') {
+      // OpenStreetMap community cartography
+      const layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+      currentTileLayerRef.current = layer;
+    } else if (activeBasemap === 'blanco') {
+      // Clean, distraction-free neutral white background mode:
+      // Focuses 100% on the 84 municipalities thematic polygons without noisy tiles
+      currentTileLayerRef.current = null;
+    }
 
     // Ensure GeoJSON and markers are re-placed on top
     if (geojsonLayerRef.current) {
@@ -166,13 +175,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         }
 
         const isSelected = selectedMunicipality && normalizeMunicipalityName(selectedMunicipality.nombre) === norm;
+        const isBlanco = activeBasemap === 'blanco';
 
         return {
           fillColor: colors.fill,
-          weight: isSelected ? 3.5 : isDimmed ? 0.75 : 1.5,
-          opacity: isDimmed ? 0.3 : 0.9,
-          color: isSelected ? '#1e1b4b' : colors.stroke,
-          fillOpacity: isDimmed ? 0.08 : isSelected ? 0.85 : (sem === 'gris' ? 0.25 : 0.65),
+          weight: isSelected ? 3.5 : isDimmed ? 0.75 : (isBlanco ? 1.8 : 1.5),
+          opacity: isDimmed ? 0.25 : 0.95,
+          color: isSelected ? '#1e1b4b' : (isBlanco ? (sem === 'gris' ? '#cbd5e1' : '#334155') : colors.stroke),
+          fillOpacity: isDimmed ? 0.08 : isSelected ? 0.85 : (sem === 'gris' ? (isBlanco ? 0.12 : 0.25) : (isBlanco ? 0.75 : 0.65)),
           dashArray: isSelected ? '4, 4' : undefined,
         };
       },
@@ -247,7 +257,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     }).addTo(map);
 
     geojsonLayerRef.current = geoLayer;
-  }, [geoData, summaryByNormalizedName, selectedMunicipality, activeFilter, onSelectMunicipality]);
+  }, [geoData, summaryByNormalizedName, selectedMunicipality, activeFilter, onSelectMunicipality, activeBasemap]);
 
   // Update critical incident markers (Potholes, bridges, shelters, fatal events)
   useEffect(() => {
@@ -346,7 +356,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   }, [searchTerm, municipalities]);
 
   return (
-    <div className="relative w-full h-[calc(100vh-145px)] min-h-[580px] bg-slate-200 overflow-hidden flex flex-col">
+    <div className={`relative w-full h-[calc(100vh-145px)] min-h-[580px] ${activeBasemap === 'blanco' ? 'bg-white' : 'bg-slate-100'} overflow-hidden flex flex-col`}>
       {/* Top Map Floating Bar */}
       <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Search bar */}
@@ -539,31 +549,54 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       </div>
 
       {/* Basemap switcher on bottom right */}
-      <div className="absolute bottom-4 right-4 z-[1000] pointer-events-auto bg-white/95 backdrop-blur-md rounded-lg p-1.5 shadow-lg border border-slate-300/80 flex items-center gap-1 text-xs font-medium">
-        <span className="text-[10px] text-slate-400 font-semibold px-1">Mapa Base:</span>
+      <div className="absolute bottom-4 right-4 z-[1000] pointer-events-auto bg-white/95 backdrop-blur-md rounded-xl p-1.5 shadow-xl border border-slate-300/80 flex items-center gap-1 text-xs font-medium">
+        <span className="text-[10px] text-slate-500 font-bold px-1.5 uppercase tracking-wider flex items-center gap-1">
+          <Layers className="w-3.5 h-3.5 text-[#691C32]" />
+          <span>Fondo:</span>
+        </span>
         <button
-          onClick={() => setActiveBasemap('carto')}
-          className={`px-2 py-1 rounded text-[11px] cursor-pointer transition-colors ${
-            activeBasemap === 'carto' ? 'bg-[#691C32] text-white' : 'text-slate-600 hover:bg-slate-100'
+          onClick={() => setActiveBasemap('google')}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+            activeBasemap === 'google' 
+              ? 'bg-[#691C32] text-white shadow-xs' 
+              : 'text-slate-700 hover:bg-slate-100'
           }`}
+          title="Mapa oficial de Google Maps con carreteras y localidades"
         >
-          Claro
+          Google Maps
         </button>
         <button
-          onClick={() => setActiveBasemap('osm')}
-          className={`px-2 py-1 rounded text-[11px] cursor-pointer transition-colors ${
-            activeBasemap === 'osm' ? 'bg-[#691C32] text-white' : 'text-slate-600 hover:bg-slate-100'
+          onClick={() => setActiveBasemap('blanco')}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+            activeBasemap === 'blanco' 
+              ? 'bg-[#691C32] text-white shadow-xs' 
+              : 'text-slate-700 hover:bg-slate-100'
           }`}
+          title="Fondo blanco temático y limpio sin elementos distractores"
         >
-          OSM
+          Fondo Blanco
         </button>
         <button
           onClick={() => setActiveBasemap('satellite')}
-          className={`px-2 py-1 rounded text-[11px] cursor-pointer transition-colors ${
-            activeBasemap === 'satellite' ? 'bg-[#691C32] text-white' : 'text-slate-600 hover:bg-slate-100'
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+            activeBasemap === 'satellite' 
+              ? 'bg-[#691C32] text-white shadow-xs' 
+              : 'text-slate-700 hover:bg-slate-100'
           }`}
+          title="Imágenes satelitales Google con carreteras"
         >
           Satélite
+        </button>
+        <button
+          onClick={() => setActiveBasemap('osm')}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+            activeBasemap === 'osm' 
+              ? 'bg-[#691C32] text-white shadow-xs' 
+              : 'text-slate-700 hover:bg-slate-100'
+          }`}
+          title="Cartografía OpenStreetMap"
+        >
+          OSM
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   MunicipalitySummary, 
   Incident, 
@@ -16,7 +16,7 @@ import { MunicipalityDetailModal } from './components/MunicipalityDetailModal';
 import { SemaforoCriteriaModal } from './components/SemaforoCriteriaModal';
 import { ReportUploadModal } from './components/ReportUploadModal';
 import { ExecutiveReportModal } from './components/ExecutiveReportModal';
-import { FileText, X, ExternalLink, ShieldCheck } from 'lucide-react';
+import { FileText, X, ExternalLink, ShieldCheck, History, UploadCloud, Link2, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'mapa' | 'dashboard' | 'tabla'>('mapa');
@@ -31,6 +31,50 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isExecutiveReportOpen, setIsExecutiveReportOpen] = useState<boolean>(false);
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState<boolean>(false);
+
+  // Dynamic official PDF configuration (allows daily updates via SFTP / manifest)
+  const [currentPdfUrl, setCurrentPdfUrl] = useState<string>('/assets/aistudio/Concentrado_Ejecutivo_Lluvias_20Oct2026_2113_Corregido_Infraestructura_Federal_63c258fe.pdf');
+  const [currentPdfTitle, setCurrentPdfTitle] = useState<string>('Concentrado Ejecutivo de Lluvias (20/10/2026 21:13 h)');
+  const [pdfHistorico, setPdfHistorico] = useState<Array<{ fecha: string; archivo: string; nombre: string }>>([
+    {
+      fecha: "20/10/2026 21:13 h",
+      archivo: "/assets/aistudio/Concentrado_Ejecutivo_Lluvias_20Oct2026_2113_Corregido_Infraestructura_Federal_63c258fe.pdf",
+      nombre: "Corte Oficial 20/Octubre - SIPDUS e Infraestructura Federal"
+    }
+  ]);
+  const [customPdfInputUrl, setCustomPdfInputUrl] = useState<string>('');
+  const [showPdfSourceSettings, setShowPdfSourceSettings] = useState<boolean>(false);
+
+  // Load manifest if available
+  useEffect(() => {
+    fetch('/assets/aistudio/reporte_vigente.json')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.archivoPdf) {
+          setCurrentPdfUrl(data.archivoPdf);
+          if (data.titulo) {
+            setCurrentPdfTitle(`${data.titulo} (${data.fechaCorte || 'Vigente'})`);
+          }
+          if (data.historico && Array.isArray(data.historico) && data.historico.length > 0) {
+            setPdfHistorico(data.historico);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleUpdateActivePdf = (fileUrl: string, fileName: string) => {
+    setCurrentPdfUrl(fileUrl);
+    setCurrentPdfTitle(`Corte Actualizado: ${fileName}`);
+    setPdfHistorico(prev => [
+      {
+        fecha: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        archivo: fileUrl,
+        nombre: fileName
+      },
+      ...prev
+    ]);
+  };
   
   // Initial category filter passed to IncidentsTable when clicked from Dashboard
   const [tableCategoryFilter, setTableCategoryFilter] = useState<AffectationCategory | 'all'>('all');
@@ -213,6 +257,7 @@ export default function App() {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onApplyChanges={handleApplyExtractionChanges}
+        onUpdateActivePdf={handleUpdateActivePdf}
       />
 
       {/* Executive Printable Situation Report Modal */}
@@ -226,35 +271,122 @@ export default function App() {
 
       {/* Official PDF Document Viewer Modal */}
       {isPdfViewerOpen && (
-        <div className="fixed inset-0 z-[1400] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl border border-slate-300 overflow-hidden flex flex-col">
-            <div className="bg-[#531325] px-5 py-3 text-white flex items-center justify-between border-b-2 border-[#BC955B]">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#BC955B]" />
-                <span className="text-sm font-bold">Documento Fuente Oficial: Concentrado Ejecutivo de Lluvias (20/10/2026)</span>
+        <div className="fixed inset-0 z-[1400] bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white w-full max-w-6xl h-[92vh] rounded-2xl shadow-2xl border border-slate-300 overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-[#531325] px-4 sm:px-5 py-3 text-white flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#BC955B]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileText className="w-5 h-5 text-[#BC955B] shrink-0" />
+                <div className="truncate">
+                  <span className="text-[10px] font-mono tracking-wider bg-rose-950/70 px-2 py-0.5 rounded text-amber-200 block sm:inline mr-2">
+                    REPORTE OFICIAL EN CONSULTA
+                  </span>
+                  <span className="text-sm font-bold text-white truncate">
+                    {currentPdfTitle}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
+
+              <div className="flex items-center gap-2 text-xs">
+                {/* Historical selector if available */}
+                {pdfHistorico.length > 1 && (
+                  <select
+                    value={currentPdfUrl}
+                    onChange={(e) => {
+                      const selected = pdfHistorico.find(h => h.archivo === e.target.value);
+                      if (selected) {
+                        setCurrentPdfUrl(selected.archivo);
+                        setCurrentPdfTitle(`Corte: ${selected.nombre} (${selected.fecha})`);
+                      }
+                    }}
+                    className="bg-rose-950 border border-rose-800 text-amber-100 rounded px-2 py-1 text-xs focus:outline-none"
+                  >
+                    {pdfHistorico.map((h, i) => (
+                      <option key={i} value={h.archivo}>
+                        {h.fecha} - {h.nombre.substring(0, 30)}...
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  onClick={() => setShowPdfSourceSettings(!showPdfSourceSettings)}
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-amber-200 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Configurar origen SFTP o enlace web"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Origen SFTP / Enlace</span>
+                </button>
+
                 <a
-                  href="/assets/aistudio/Concentrado_Ejecutivo_Lluvias_20Oct2026_2113_Corregido_Infraestructura_Federal_63c258fe.pdf"
+                  href={currentPdfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-amber-200 hover:text-white flex items-center gap-1 underline"
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs flex items-center gap-1 transition-colors"
                 >
-                  <span>Abrir en pestaña externa</span>
                   <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Pestaña externa</span>
                 </a>
+
                 <button
                   onClick={() => setIsPdfViewerOpen(false)}
-                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer ml-1"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-slate-100">
+
+            {/* Quick configuration bar for SFTP / external URL or testing local files */}
+            {showPdfSourceSettings && (
+              <div className="bg-slate-800 text-slate-200 px-4 py-2.5 border-b border-slate-700 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex-1 min-w-[260px] flex items-center gap-2">
+                  <span className="text-slate-400 whitespace-nowrap">URL directa / SFTP Web:</span>
+                  <input
+                    type="url"
+                    placeholder="https://servidor.hidalgo.gob.mx/reportes/corte_23Oct.pdf"
+                    value={customPdfInputUrl}
+                    onChange={(e) => setCustomPdfInputUrl(e.target.value)}
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                  <button
+                    onClick={() => {
+                      if (customPdfInputUrl.trim()) {
+                        setCurrentPdfUrl(customPdfInputUrl.trim());
+                        setCurrentPdfTitle(`Enlace Remoto: ${customPdfInputUrl.trim().split('/').pop() || 'Reporte'}`);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-[#BC955B] text-slate-950 font-bold rounded text-xs hover:bg-amber-400 cursor-pointer"
+                  >
+                    Cargar
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded cursor-pointer text-xs font-medium">
+                    <span>Probar archivo local (.pdf)</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const url = URL.createObjectURL(file);
+                          handleUpdateActivePdf(url, file.name);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Document Iframe */}
+            <div className="flex-1 bg-slate-100 relative">
               <iframe
-                src="/assets/aistudio/Concentrado_Ejecutivo_Lluvias_20Oct2026_2113_Corregido_Infraestructura_Federal_63c258fe.pdf"
-                title="Concentrado Ejecutivo Oficial de Lluvias"
+                src={currentPdfUrl}
+                title={currentPdfTitle}
                 className="w-full h-full border-none"
               />
             </div>
