@@ -1,0 +1,8 @@
+{
+  "name": "SIAM",
+  "description": "Plataforma interactiva SIG y de Protección Civil para el monitoreo, semaforización municipal y trazabilidad de afectaciones meteorológicas en los 84 municipios del Estado de Hidalgo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
